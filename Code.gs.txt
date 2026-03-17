@@ -23,19 +23,21 @@ function doGet(e) {
   return ContentService.createTextOutput('ONE桌遊發票 Email API');
 }
 
-// doPost - 接收 Email 提交
+// doPost - 接收 Email、地址、統編提交
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     const storeId = data.store_id;
     const email = data.email;
+    const address = data.address;
+    const taxId = data.tax_id;
     
     if (!storeId || !email) {
       return createJsonResponse({ success: false, error: '缺少必要參數' });
     }
     
-    // 更新 Email
-    const result = updateEmail(storeId, email);
+    // 更新資料
+    const result = updateEmail(storeId, email, address, taxId);
     return createJsonResponse(result);
     
   } catch (error) {
@@ -67,15 +69,18 @@ function getStores() {
   return createJsonResponse(stores);
 }
 
-// 更新 Email
-function updateEmail(storeId, email) {
+// 更新 Email、地址、統編
+function updateEmail(storeId, email, address, taxId) {
   const sheet = getSheet();
   const data = sheet.getDataRange().getValues();
   
-  // 找到 id 欄位的索引
-  const idColIndex = data[0].indexOf('id');
-  const emailColIndex = data[0].indexOf('email');
-  const updatedColIndex = data[0].indexOf('updated_at');
+  // 找到欄位索引
+  const headers = data[0];
+  const idColIndex = headers.indexOf('id');
+  const emailColIndex = headers.indexOf('email');
+  const addressColIndex = headers.indexOf('地址');
+  const taxIdColIndex = headers.indexOf('統編_二聯式填無_');
+  const updatedColIndex = headers.indexOf('updated_at');
   
   if (idColIndex === -1 || emailColIndex === -1) {
     return { success: false, error: '找不到必要欄位' };
@@ -87,13 +92,23 @@ function updateEmail(storeId, email) {
       // 更新 Email
       sheet.getRange(i + 1, emailColIndex + 1).setValue(email);
       
+      // 更新地址（如果有提供）
+      if (address && addressColIndex !== -1) {
+        sheet.getRange(i + 1, addressColIndex + 1).setValue(address);
+      }
+      
+      // 更新統編（如果有提供）
+      if (taxId !== undefined && taxIdColIndex !== -1) {
+        sheet.getRange(i + 1, taxIdColIndex + 1).setValue(taxId);
+      }
+      
       // 更新時間
       if (updatedColIndex !== -1) {
         const now = new Date().toISOString();
         sheet.getRange(i + 1, updatedColIndex + 1).setValue(now);
       }
       
-      return { success: true, message: 'Email 已更新' };
+      return { success: true, message: '資料已更新' };
     }
   }
   
