@@ -295,12 +295,12 @@
                     <input type="text" id="storeName" class="readonly" readonly>
                 </div>
                 <div class="form-group">
-                    <label>地址</label>
-                    <input type="text" id="storeAddress" class="readonly" readonly>
+                    <label>地址（可修改）</label>
+                    <input type="text" id="storeAddress">
                 </div>
                 <div class="form-group">
-                    <label>統一編號</label>
-                    <input type="text" id="storeTaxId" class="readonly" readonly>
+                    <label>統一編號（可修改）</label>
+                    <input type="text" id="storeTaxId">
                 </div>
                 <div class="form-group">
                     <label>📧 Email（請填寫接收電子發票的信箱） *</label>
@@ -455,6 +455,8 @@
         // 送出表單
         document.getElementById('submitBtn').addEventListener('click', async () => {
             const email = document.getElementById('emailInput').value.trim();
+            const address = document.getElementById('storeAddress').value.trim();
+            const taxId = document.getElementById('storeTaxId').value.trim();
             
             if (!email) {
                 alert('請填寫 Email');
@@ -463,6 +465,11 @@
             
             if (!validateEmail(email)) {
                 alert('Email 格式不正確');
+                return;
+            }
+            
+            if (!address) {
+                alert('請填寫地址');
                 return;
             }
             
@@ -482,7 +489,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         store_id: selectedStore.id,
-                        email: email
+                        email: email,
+                        address: address,
+                        tax_id: taxId
                     })
                 });
                 
