@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONE桌遊 - 發票 Email 管理後台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f7fa;
+            padding: 15px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+        
+        .stat-card {
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            background: white;
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .search-input {
+            flex: 1;
+            min-width: 220px;
+            padding: 11px 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+        
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .filter-btn {
+            padding: 9px 18px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .export-btn {
+            padding: 11px 22px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .export-btn:hover {
+            background: #059669;
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            overflow-x: auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+        
+        thead {
+            background: #667eea;
+            color: white;
+        }
+        
+        th {
+            padding: 13px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+        
+        tbody tr:hover {
+            background: #f8f9ff;
+        }
+        
+        td {
+            padding: 13px;
+            font-size: 14px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .email-cell {
+            color: #667eea;
+            font-weight: 500;
+        }
+        
+        .empty-email {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        @media (max-width: 768px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 ONE桌遊 - 發票 Email 管理後台</h1>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalStores">0</div>
+                    <div class="stat-label">總店家數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="completedStores">0</div>
+                    <div class="stat-label">已填寫</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="pendingStores">0</div>
+                    <div class="stat-label">未填寫</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="completionRate">0%</div>
+                    <div class="stat-label">完成率</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">載入中...</div>
+        
+        <div id="mainContent" style="display:none;">
+            <div class="controls">
+                <input type="text" class="search-input" id="searchInput" placeholder="🔍 搜尋店名、地址...">
+                
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">全部</button>
+                    <button class="filter-btn" data-filter="completed">已填寫</button>
+                    <button class="filter-btn" data-filter="pending">未填寫</button>
+                </div>
+                
+                <button class="export-btn" id="exportBtn">📥 匯出 Email 清單</button>
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>編號</th>
+                            <th>店名</th>
+                            <th>地址</th>
+                            <th>統編</th>
+                            <th>月費</th>
+                            <th>Email</th>
+                            <th>狀態</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ 請替換成你的 Google Apps Script 網址
+        const GAS_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+        
+        let stores = [];
+        let currentFilter = 'all';
+
+        // 載入資料
+        async function loadStores() {
+            try {
+                const response = await fetch(GAS_URL + '?action=getStores');
+                stores = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                
+                updateStats();
+                displayStores();
+            } catch (error) {
+                console.error('載入資料失敗:', error);
+                document.getElementById('loading').textContent = '載入失敗，請重新整理頁面';
+            }
+        }
+
+        // 更新統計
+        function updateStats() {
+            const total = stores.length;
+            const completed = stores.filter(s => s.email).length;
+            const pending = total - completed;
+            const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+            
+            document.getElementById('totalStores').textContent = total;
+            document.getElementById('completedStores').textContent = completed;
+            document.getElementById('pendingStores').textContent = pending;
+            document.getElementById('completionRate').textContent = rate + '%';
+        }
+
+        // 顯示店家
+        function displayStores() {
+            const searchKeyword = document.getElementById('searchInput').value.toLowerCase();
+            
+            let filtered = stores;
+            
+            // 搜尋過濾
+            if (searchKeyword) {
+                filtered = filtered.filter(s => {
+                    const name = (s['店名'] || s.name || '').toLowerCase();
+                    const address = (s['地址'] || s.address || '').toLowerCase();
+                    return name.includes(searchKeyword) || address.includes(searchKeyword);
+                });
+            }
+            
+            // 狀態過濾
+            if (currentFilter === 'completed') {
+                filtered = filtered.filter(s => s.email);
+            } else if (currentFilter === 'pending') {
+                filtered = filtered.filter(s => !s.email);
+            }
+            
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = filtered.map(store => {
+                const name = store['店名'] || store.name || '未命名';
+                const address = store['地址'] || store.address || '';
+                const taxId = store['統編_二聯式填無_'] || store.tax_id || '-';
+                const monthlyFee = store['月費'] || store.monthly_fee || 0;
+                const email = store.email || '';
+                
+                return `
+                    <tr>
+                        <td>${store.id}</td>
+                        <td><strong>${name}</strong></td>
+                        <td>${address}</td>
+                        <td>${taxId}</td>
+                        <td>$${monthlyFee.toLocaleString()}</td>
+                        <td>
+                            ${email 
+                                ? `<span class="email-cell">${email}</span>` 
+                                : `<span class="empty-email">未填寫</span>`
+                            }
+                        </td>
+                        <td>
+                            ${email 
+                                ? `<span class="status-badge status-completed">✓ 已完成</span>`
+                                : `<span class="status-badge status-pending">⏳ 待填寫</span>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 搜尋
+        document.getElementById('searchInput').addEventListener('input', displayStores);
+
+        // 過濾按鈕
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                displayStores();
+            });
+        });
+
+        // 匯出
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const withEmail = stores.filter(s => s.email);
+            const csv = [
+                ['編號', '店名', '地址', '統編', 'Email'].join(','),
+                ...withEmail.map(s => {
+                    const name = s['店名'] || s.name || '';
+                    const address = s['地址'] || s.address || '';
+                    const taxId = s['統編_二聯式填無_'] || s.tax_id || '';
+                    return [
+                        s.id,
+                        `"${name}"`,
+                        `"${address}"`,
+                        taxId,
+                        s.email
+                    ].join(',');
+                })
+            ].join('\n');
+            
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `店家Email清單_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        });
+
+        // 初始化
+        loadStores();
+    </script>
+</body>
+</html>
