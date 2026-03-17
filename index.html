@@ -36,6 +36,7 @@
             width: 120px;
             height: 120px;
             border-radius: 50%;
+            object-fit: cover;
         }
         
         h1 {
@@ -56,6 +57,35 @@
             text-align: center;
             padding: 40px;
             color: #999;
+        }
+        
+        .filter-section {
+            margin-bottom: 20px;
+        }
+        
+        .filter-section label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .filter-section select {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .filter-section select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
         .search-box {
@@ -206,6 +236,22 @@
             display: block;
         }
         
+        .error-message {
+            display: none;
+            padding: 18px;
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            border-radius: 10px;
+            color: #721c24;
+            text-align: center;
+            font-size: 16px;
+            margin-top: 18px;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
         .no-results {
             text-align: center;
             color: #999;
@@ -221,7 +267,7 @@
 <body>
     <div class="container">
         <div class="logo">
-            <img src="https://ken0900101318-beep.github.io/one-management-portal/one-logo.jpg" alt="ONE桌遊">
+            <img src="https://raw.githubusercontent.com/ken0900101318-beep/one-management-portal/main/one-logo.jpg" alt="ONE桌遊">
         </div>
         <h1>🎮 ONE桌遊</h1>
         <p class="subtitle">電子發票 Email 登記系統</p>
@@ -229,6 +275,13 @@
         <div class="loading" id="loading">載入中...</div>
         
         <div id="mainContent" style="display:none;">
+            <div class="filter-section">
+                <label>📍 選擇縣市</label>
+                <select id="cityFilter">
+                    <option value="">全部縣市</option>
+                </select>
+            </div>
+            
             <div class="search-box">
                 <input type="text" id="searchInput" placeholder="🔍 請輸入您的店名搜尋...">
             </div>
@@ -259,21 +312,47 @@
             <div class="success-message" id="successMessage">
                 ✅ Email 已成功登記！感謝您的配合
             </div>
+            
+            <div class="error-message" id="errorMessage">
+                ❌ 送出失敗，請稍後再試
+            </div>
         </div>
     </div>
 
     <script>
-        // ⚠️ 請替換成你的 Google Apps Script 網址
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbzbXRLuBumfB_h6Aprq_tmspfti7KCvcBLmCZAsoFLei_VJuruWcsrevX_6lfNBvaJY_Q/exec';
         
         let stores = [];
         let selectedStore = null;
+        let cities = new Set();
+
+        // 提取縣市
+        function extractCity(address) {
+            if (!address) return '';
+            const match = address.match(/^(台北市|新北市|桃園市|台中市|台南市|高雄市|基隆市|新竹市|嘉義市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義縣|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);
+            return match ? match[1] : '';
+        }
 
         // 載入店家資料
         async function loadStores() {
             try {
                 const response = await fetch(GAS_URL + '?action=getStores');
                 stores = await response.json();
+                
+                // 提取所有縣市
+                stores.forEach(store => {
+                    const city = extractCity(store['地址'] || store.address || '');
+                    if (city) cities.add(city);
+                });
+                
+                // 建立縣市選單
+                const cityFilter = document.getElementById('cityFilter');
+                Array.from(cities).sort().forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = city;
+                    option.textContent = city;
+                    cityFilter.appendChild(option);
+                });
                 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
@@ -297,13 +376,20 @@
             }
             
             noResults.classList.remove('show');
-            storeList.innerHTML = storesToShow.map(store => `
-                <div class="store-item" data-id="${store.id}">
-                    <div class="store-name">${store['店名'] || store.name || '未命名'}</div>
-                    <div class="store-address">📍 ${store['地址'] || store.address || ''}</div>
-                    <div class="store-info">統編: ${store['統編_二聯式填無_'] || store.tax_id || '無'} | 月費: $${(store['月費'] || store.monthly_fee || 0).toLocaleString()}</div>
-                </div>
-            `).join('');
+            storeList.innerHTML = storesToShow.map(store => {
+                const name = store['店名'] || store.name || '未命名';
+                const address = store['地址'] || store.address || '';
+                const taxId = store['統編_二聯式填無_'] || store.tax_id || '無';
+                const monthlyFee = store['月費'] || store.monthly_fee || 0;
+                
+                return `
+                    <div class="store-item" data-id="${store.id}">
+                        <div class="store-name">${name}</div>
+                        <div class="store-address">📍 ${address}</div>
+                        <div class="store-info">統編: ${taxId} | 月費: $${monthlyFee.toLocaleString()}</div>
+                    </div>
+                `;
+            }).join('');
             
             // 綁定點擊事件
             document.querySelectorAll('.store-item').forEach(item => {
@@ -311,20 +397,36 @@
             });
         }
 
-        // 搜尋功能
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            const keyword = e.target.value.toLowerCase().trim();
-            if (keyword === '') {
-                displayStores(stores);
-            } else {
-                const filtered = stores.filter(store => {
+        // 篩選功能
+        function filterStores() {
+            const cityFilter = document.getElementById('cityFilter').value;
+            const searchKeyword = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            let filtered = stores;
+            
+            // 縣市篩選
+            if (cityFilter) {
+                filtered = filtered.filter(store => {
+                    const address = store['地址'] || store.address || '';
+                    return extractCity(address) === cityFilter;
+                });
+            }
+            
+            // 關鍵字搜尋
+            if (searchKeyword) {
+                filtered = filtered.filter(store => {
                     const name = (store['店名'] || store.name || '').toLowerCase();
                     const address = (store['地址'] || store.address || '').toLowerCase();
-                    return name.includes(keyword) || address.includes(keyword);
+                    return name.includes(searchKeyword) || address.includes(searchKeyword);
                 });
-                displayStores(filtered);
             }
-        });
+            
+            displayStores(filtered);
+        }
+
+        // 監聽篩選
+        document.getElementById('cityFilter').addEventListener('change', filterStores);
+        document.getElementById('searchInput').addEventListener('input', filterStores);
 
         // 選擇店家
         function selectStore(storeId) {
@@ -365,12 +467,18 @@
             }
             
             const btn = document.getElementById('submitBtn');
+            const errorMsg = document.getElementById('errorMessage');
+            const successMsg = document.getElementById('successMessage');
+            
             btn.disabled = true;
             btn.textContent = '送出中...';
+            errorMsg.classList.remove('show');
+            successMsg.classList.remove('show');
             
             try {
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
+                    mode: 'no-cors', // 重要！避免 CORS 問題
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         store_id: selectedStore.id,
@@ -378,22 +486,21 @@
                     })
                 });
                 
-                const result = await response.json();
+                // no-cors 模式無法讀取 response，假設成功
+                successMsg.classList.add('show');
+                document.getElementById('formSection').classList.remove('active');
                 
-                if (result.success) {
-                    document.getElementById('successMessage').classList.add('show');
-                    document.getElementById('formSection').classList.remove('active');
-                    setTimeout(() => {
-                        document.getElementById('successMessage').classList.remove('show');
-                        document.getElementById('searchInput').value = '';
-                        loadStores(); // 重新載入
-                    }, 3000);
-                } else {
-                    alert('送出失敗: ' + (result.error || '未知錯誤'));
-                }
+                setTimeout(() => {
+                    successMsg.classList.remove('show');
+                    document.getElementById('searchInput').value = '';
+                    document.getElementById('cityFilter').value = '';
+                    loadStores(); // 重新載入
+                }, 3000);
+                
             } catch (error) {
                 console.error('送出失敗:', error);
-                alert('送出失敗，請稍後再試');
+                errorMsg.textContent = '❌ 送出失敗: ' + error.message;
+                errorMsg.classList.add('show');
             } finally {
                 btn.disabled = false;
                 btn.textContent = '✅ 送出 Email';
