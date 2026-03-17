@@ -380,13 +380,12 @@
                 const name = store['店名'] || store.name || '未命名';
                 const address = store['地址'] || store.address || '';
                 const taxId = store['統編_二聯式填無_'] || store.tax_id || '無';
-                const monthlyFee = store['月費'] || store.monthly_fee || 0;
                 
                 return `
                     <div class="store-item" data-id="${store.id}">
                         <div class="store-name">${name}</div>
                         <div class="store-address">📍 ${address}</div>
-                        <div class="store-info">統編: ${taxId} | 月費: $${monthlyFee.toLocaleString()}</div>
+                        <div class="store-info">統編: ${taxId}</div>
                     </div>
                 `;
             }).join('');
