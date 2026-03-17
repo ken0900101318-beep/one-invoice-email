@@ -1,0 +1,184 @@
+// ONE桌遊發票 Email 收集系統 - Google Apps Script
+// 請將此代碼貼到 Google Apps Script 編輯器
+
+// 試算表 ID（請替換成你的）
+const SPREADSHEET_ID = '你的試算表ID';
+const SHEET_NAME = '店家資料';
+
+// 取得試算表
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  return ss.getSheetByName(SHEET_NAME);
+}
+
+// doGet - 提供資料 API
+function doGet(e) {
+  const action = e.parameter.action;
+  
+  if (action === 'getStores') {
+    return getStores();
+  }
+  
+  // 預設返回歡迎訊息
+  return ContentService.createTextOutput('ONE桌遊發票 Email API');
+}
+
+// doPost - 接收 Email 提交
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const storeId = data.store_id;
+    const email = data.email;
+    
+    if (!storeId || !email) {
+      return createJsonResponse({ success: false, error: '缺少必要參數' });
+    }
+    
+    // 更新 Email
+    const result = updateEmail(storeId, email);
+    return createJsonResponse(result);
+    
+  } catch (error) {
+    Logger.log('錯誤: ' + error);
+    return createJsonResponse({ success: false, error: error.toString() });
+  }
+}
+
+// 取得所有店家資料
+function getStores() {
+  const sheet = getSheet();
+  const data = sheet.getDataRange().getValues();
+  
+  // 第一行是標題
+  const headers = data[0];
+  const stores = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const store = {};
+    
+    headers.forEach((header, index) => {
+      store[header] = row[index] || '';
+    });
+    
+    stores.push(store);
+  }
+  
+  return createJsonResponse(stores);
+}
+
+// 更新 Email
+function updateEmail(storeId, email) {
+  const sheet = getSheet();
+  const data = sheet.getDataRange().getValues();
+  
+  // 找到 id 欄位的索引
+  const idColIndex = data[0].indexOf('id');
+  const emailColIndex = data[0].indexOf('email');
+  const updatedColIndex = data[0].indexOf('updated_at');
+  
+  if (idColIndex === -1 || emailColIndex === -1) {
+    return { success: false, error: '找不到必要欄位' };
+  }
+  
+  // 找到對應的店家
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idColIndex] == storeId) {
+      // 更新 Email
+      sheet.getRange(i + 1, emailColIndex + 1).setValue(email);
+      
+      // 更新時間
+      if (updatedColIndex !== -1) {
+        const now = new Date().toISOString();
+        sheet.getRange(i + 1, updatedColIndex + 1).setValue(now);
+      }
+      
+      return { success: true, message: 'Email 已更新' };
+    }
+  }
+  
+  return { success: false, error: '找不到店家' };
+}
+
+// 建立 JSON 回應
+function createJsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// 初始化試算表（第一次執行）
+function initializeSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+  }
+  
+  // 設定標題列
+  const headers = [
+    'id',
+    '月費',
+    '合併轉帳家數',
+    '備註',
+    '店名',
+    '地址',
+    '發票開二聯式或三聯式',
+    '買受人_個人填姓名，公司請填公司名_',
+    '統編_二聯式填無_',
+    '發票收件人',
+    '郵遞區號',
+    '發票收件地址_請填可以收掛號信的_',
+    '發票收件人聯絡電話',
+    '匯款帳號後五碼_會計對帳_',
+    'email',
+    'updated_at'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.setFrozenRows(1);
+  
+  Logger.log('試算表初始化完成');
+}
+
+// 匯入 JSON 資料（第一次執行）
+function importJsonData() {
+  // 請將 stores.json 的內容貼到這裡
+  const jsonData = []; // 將你的 JSON 陣列貼在這裡
+  
+  const sheet = getSheet();
+  
+  // 清除現有資料（保留標題）
+  if (sheet.getLastRow() > 1) {
+    sheet.deleteRows(2, sheet.getLastRow() - 1);
+  }
+  
+  // 準備資料
+  const rows = jsonData.map(store => [
+    store.id,
+    store['月費'] || '',
+    store['合併轉帳家數'] || '',
+    store['備註'] || '',
+    store['店名'] || '',
+    store['地址'] || '',
+    store['發票開二聯式或三聯式'] || '',
+    store['買受人_個人填姓名，公司請填公司名_'] || '',
+    store['統編_二聯式填無_'] || '',
+    store['發票收件人'] || '',
+    store['郵遞區號'] || '',
+    store['發票收件地址_請填可以收掛號信的_'] || '',
+    store['發票收件人聯絡電話'] || '',
+    store['匯款帳號後五碼_會計對帳_'] || '',
+    store.email || '',
+    store.updated_at || ''
+  ]);
+  
+  // 寫入資料
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  Logger.log(`已匯入 ${rows.length} 筆資料`);
+}
